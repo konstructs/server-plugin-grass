@@ -29,7 +29,7 @@ konstructs {
 
 Time for a little code, this is a simple example that prints out hello world on start.
 
-```
+```java
 package org.konstructs.grass;
 
 import akka.actor.ActorRef;
