@@ -30,16 +30,16 @@ konstructs {
 Time for a little code, this is a simple example that prints out hello world on start.
 
 ```java
-package org.konstructs.grass;
+package my.name.space;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
 
-public class GrassActor extends KonstructsActor {
+public class MyPluginClass extends KonstructsActor {
 
-    public GrassActor(ActorRef universe) {
+    public MyPluginClass(ActorRef universe) {
         super(universe);
         System.out.println("Hello World!");
     }
