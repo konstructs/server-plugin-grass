@@ -17,13 +17,11 @@ reference.conf is the plugins main configuration file, it will be *merged* with 
 The layout is as follows:
 ```
 konstructs {
-  my/name/space {
+  my/name/space/plugin-name {
     class = my.name.space.MyPluginClass
   }
 }
 ```
-
-`my/name/space` can be anything but try to keep it to the java package namespace to keep thing simple, and to avoid collisions.
 
 ## Java
 
