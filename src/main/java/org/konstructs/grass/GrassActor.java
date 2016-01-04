@@ -2,18 +2,24 @@ package org.konstructs.grass;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import konstructs.plugin.KonstructsActor;
+import akka.actor.UntypedActorWithStash;
 import konstructs.plugin.PluginConstructor;
 
-public class GrassActor extends KonstructsActor {
+public class GrassActor extends UntypedActorWithStash {
+
+    ActorRef universe;
 
     public GrassActor(ActorRef universe) {
-        super(universe);
+        this.universe = universe;
+        System.out.println("Grass actor loaded");
+    }
+
+    public void onReceive(Object message) {
+        System.out.println("got message: " + message);
     }
 
     @PluginConstructor
     public static Props props(String pluginName, ActorRef universe) {
-        Class currentClass = new Object() { }.getClass().getEnclosingClass();
-        return Props.create(currentClass, universe);
+        return Props.create(GrassActor.class, universe);
     }
 }
