@@ -8,5 +8,5 @@ repositories {
 }
 
 dependencies {
-    compile group: 'org.konstructs', name: 'konstructs-server_2.10', version: '0.1.11'
+    compile group: 'org.konstructs', name: 'konstructs-server_2.10', version: '0.1.12'
 }
