@@ -75,11 +75,8 @@ public class GrassActor extends KonstructsActor {
 
         BlockTypeId blockType = blockEvent.block().type();
         if (blockType.namespace().equals("org/konstructs") && blockType.name().equals("dirt")) {
-            if (Math.random() > 0.5) { // only give it 50% chance to grow
-                dirtBlocksCandidate.add(blockEvent.pos());
-                askForBlockAt(blockEvent.pos(), 0, 1, 0); // ask server for above block.
-            }
-
+            dirtBlocksCandidate.add(blockEvent.pos());
+            askForBlockAt(blockEvent.pos(), 0, 1, 0); // ask server for above block.
         }
 
         Position under = new Position(
