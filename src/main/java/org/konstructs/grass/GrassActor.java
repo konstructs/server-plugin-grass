@@ -140,8 +140,8 @@ public class GrassActor extends KonstructsActor {
             dirtBlocksToGrow.remove(pos);
         }
 
-        // Schedule another ProcessDirtBlock in 2 to 4 seconds
-        scheduleSelfOnce(new ProcessDirtBlock(), 2000 + (int)(Math.random() * 2000));
+        // Schedule another ProcessDirtBlock in 4 to 30 seconds
+        scheduleSelfOnce(new ProcessDirtBlock(), 4000 + (int)(Math.random() * 30000));
     }
 
     /**
