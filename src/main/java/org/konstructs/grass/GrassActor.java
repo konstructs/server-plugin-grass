@@ -12,14 +12,7 @@ public class GrassActor extends KonstructsActor {
 
     // Message classes sent to the actor
     class ProcessDirtBlock {}
-    class CheckForDirtBlock {
-        Position position;
-        public CheckForDirtBlock(Position position) {
-            this.position = position;
-        }
-    }
 
-    private ArrayList<Position> dirtBlocksCandidate;
     private ArrayList<Position> dirtBlocksToGrow;
 
     /**
@@ -29,7 +22,6 @@ public class GrassActor extends KonstructsActor {
      */
     public GrassActor(ActorRef universe) {
         super(universe);
-        dirtBlocksCandidate = new ArrayList<Position>();
         dirtBlocksToGrow = new ArrayList<Position>();
 
         // Schedule a ProcessDirtBlock in 2 seconds
@@ -45,19 +37,17 @@ public class GrassActor extends KonstructsActor {
     public void onReceive(Object message) {
 
         if (message instanceof EventBlockUpdated) {
-            EventBlockUpdated block = (EventBlockUpdated)message;
-            onEventBlockUpdated(block);
+            onEventBlockUpdated((EventBlockUpdated)message);
+            return;
+        }
+
+        if (message instanceof BoxQueryResult) {
+            onBoxQueryResult((BoxQueryResult)message);
             return;
         }
 
         if (message instanceof ProcessDirtBlock) {
             processDirtBlock();
-            return;
-        }
-
-        if (message instanceof BlockViewed) {
-            BlockViewed block = (BlockViewed)message;
-            onBlockViewed(block);
             return;
         }
 
@@ -67,99 +57,105 @@ public class GrassActor extends KonstructsActor {
 
     /**
      * Events related to block placements/updates.
-     *
-     * @param blockEvent
      */
     @Override
     public void onEventBlockUpdated(EventBlockUpdated blockEvent) {
-
-        BlockTypeId blockType = blockEvent.block().type();
-        if (blockType.namespace().equals("org/konstructs") && blockType.name().equals("dirt")) {
-            dirtBlocksCandidate.add(blockEvent.pos());
-            askForBlockAt(blockEvent.pos(), 0, 1, 0); // ask server for above block.
-        }
-
-        Position under = new Position(
-                blockEvent.pos().x(),
-                blockEvent.pos().y() - 1,
-                blockEvent.pos().z()
-        );
-
-        if (dirtBlocksCandidate.contains(under)) {
-            dirtBlocksCandidate.remove(under);
+        if (blockEvent.block().type().fullName().equals("org/konstructs/dirt")) {
+            boxQuery(
+                    new Position(
+                            blockEvent.pos().x() - 2,
+                            blockEvent.pos().y() - 2,
+                            blockEvent.pos().z() - 2
+                    ),
+                    new Position(
+                            blockEvent.pos().x() + 2,
+                            blockEvent.pos().y() + 2,
+                            blockEvent.pos().z() + 2
+                    )
+            );
         }
     }
 
+    @Override
+    public void onBoxQueryResult(BoxQueryResult result) {
+
+        // Make sure that the center block is dirt
+        if(!getBlockTypeIdFromResult(result, 0, 0, 0).fullName().equals("org/konstructs/dirt")) {
+            System.out.println("[Grass] Error, the center block is not dirt, abort.");
+            System.out.println("[Grass] I got a " + getBlockTypeIdFromResult(result, 0, 0, 0).fullName());
+            Position pos = getPositionFromResult(result, 0, 0, 0);
+            System.out.println("[Grass] I have marked the block with a brick at " + pos);
+            putBlock(pos, Block.create(new BlockTypeId("org/konstructs", "brick")));
+
+            return;
+        }
+
+        // Check if center is a candidate, check for air vacuum center
+        if (getBlockTypeIdFromResult(result, 0, 1, 0).fullName().equals("org/konstructs/vacuum")) {
+            dirtBlocksToGrow.add(getPositionFromResult(result, 0, 1, 0));
+        }
+
+        // The x side
+        boolean vacuumAbove = false;
+        for (int h = 1; h > -1; h--) {
+            if (getBlockTypeIdFromResult(result, 1, h, 0).fullName().equals("org/konstructs/vacuum")) {
+                vacuumAbove = true;
+            } else {
+                if (vacuumAbove && getBlockTypeIdFromResult(result, 1, h, 0).fullName().equals("org/konstructs/dirt")) {
+                    Position pos = getPositionFromResult(result, 1, h, 0);
+                    putBlock(pos, Block.create(new BlockTypeId("org/konstructs", "brick")));
+                }
+                vacuumAbove = false;
+            }
+        }
+
+
+    }
+
+    private BlockTypeId getBlockTypeIdFromResult(BoxQueryResult result, int x, int y, int z) {
+        return result.result().data().get(result.result().box().index(x + 2, y + 2, z + 2));
+    }
+
+    private Position getPositionFromResult(BoxQueryResult result, int x, int y, int z) {
+
+        Position middle = new Position(
+                result.result().box().start().x() + 2,
+                result.result().box().start().y() + 2,
+                result.result().box().start().z() + 2
+        );
+
+        return new Position(
+                middle.x() + x,
+                middle.y() + y,
+                middle.z() + z
+        );
+    }
+
+
     /**
      * This method picks a random item from the dirt block list and replaces
-     * it with a grass block. It then queries universe for all surrounding blocks.
+     * it with a grass block.
      */
     private void processDirtBlock() {
         if (dirtBlocksToGrow.size() > 0) {
             int pos = (int) (Math.random() * dirtBlocksToGrow.size());
-            Position blockPos = dirtBlocksToGrow.get(pos);
-            getUniverse().tell(
-                    new ReplaceBlock(blockPos,
-                            Block.create(new BlockTypeId("org/konstructs", "grass-dirt"))),
-                    getSelf()
-            );
+            growDirtBlock(dirtBlocksToGrow.get(pos));
             dirtBlocksToGrow.remove(pos);
-
-            // Send a CheckForDirtBlock message to all surrounding blocks.
-            for (int x = -1; x < 2; x++) {
-                for (int y = -1; y < 2; y++) {
-                    for (int z = -1; z < 2; z++) {
-                        askForBlockAt(blockPos, x, y, z);
-                    }
-                }
-            }
         }
+
         // Schedule another ProcessDirtBlock in 2 seconds
         scheduleSelfOnce(new ProcessDirtBlock(), 2000);
-
-        if (dirtBlocksCandidate.size() > 1000 || dirtBlocksToGrow.size() > 5000) {
-            System.out.println("STATS: grass candidates: " + dirtBlocksCandidate.size() + " grow: " + dirtBlocksToGrow.size());
-        }
     }
 
     /**
-     * Ask universe for a block at blockPos, with offsets.
-     *
-     * @param blockPos
+     * Ready to grow a block (turn a dirt block to a grass block), use the ReplaceBlockIf
+     * massage to make sure the location still contains a dirt block. If this fails, we will
+     * get a message back, for our use case that do not matter so we will ignore it.
      */
-    private void askForBlockAt(Position blockPos, int x, int y, int z) {
-        getUniverse().tell(
-                new ViewBlock(
-                        new Position(
-                                blockPos.x() + x,
-                                blockPos.y() + y,
-                                blockPos.z() + z
-                        )
-                ), getSelf()
-        );
-    }
-
-    /**
-     * When we got the response from universe with a block, we check if it's a candidate
-     * and updates the list.
-     */
-    public void onBlockViewed(BlockViewed block) {
-        BlockTypeId blockType = block.block().type();
-        if (blockType.namespace().equals("org/konstructs") && blockType.name().equals("vacuum")) {
-            for (Position p : dirtBlocksCandidate) {
-                if (p.x() == block.pos().x()) {
-                    if (p.y() == block.pos().y() - 1) {
-                        if (p.z() == block.pos().z()) {
-                            dirtBlocksCandidate.remove(p);
-                            dirtBlocksToGrow.add(p);
-                            return;
-                        }
-                    }
-                }
-            }
-        } else {
-            onEventBlockUpdated(new EventBlockUpdated(block.pos(), block.block()));
-        }
+    private void growDirtBlock(Position pos) {
+        Block target_type = Block.create(new BlockTypeId("org/konstructs", "grass-dirt"));
+        Block source_type = Block.create(new BlockTypeId("org/konstructs", "dirt"));
+        getUniverse().tell(new ReplaceBlockIf(pos, target_type, source_type), getSelf());
     }
 
     /**
