@@ -56,11 +56,16 @@ public class GrassActor extends KonstructsActor {
     }
 
     /**
-     * Events related to block placements/updates.
+     * Events related to block placements/updates. We filter out grass placements
+     * and triggers a boxQuery(..) lookup around the placed block.
      */
     @Override
     public void onEventBlockUpdated(EventBlockUpdated blockEvent) {
-        if (blockEvent.block().type().fullName().equals("org/konstructs/dirt")) {
+
+        if (!blockEvent.block().type().namespace().equals("org/konstructs"))
+            return;
+
+        if (blockEvent.block().type().name().equals("grass-dirt")) {
             boxQuery(
                     new Position(
                             blockEvent.pos().x() - 2,
@@ -74,88 +79,82 @@ public class GrassActor extends KonstructsActor {
                     )
             );
         }
+
     }
 
+    /**
+     * This event is triggered when we get the result from a boxQuery(..).
+     * We walk through the result data and looks for candidates to grow.
+     */
     @Override
     public void onBoxQueryResult(BoxQueryResult result) {
-
-        // Make sure that the center block is dirt
-        if(!getBlockTypeIdFromResult(result, 0, 0, 0).fullName().equals("org/konstructs/dirt")) {
-            System.out.println("[Grass] Error, the center block is not dirt, abort.");
-            System.out.println("[Grass] I got a " + getBlockTypeIdFromResult(result, 0, 0, 0).fullName());
-            Position pos = getPositionFromResult(result, 0, 0, 0);
-            System.out.println("[Grass] I have marked the block with a brick at " + pos);
-            putBlock(pos, Block.create(new BlockTypeId("org/konstructs", "brick")));
-
-            return;
-        }
-
-        // Check if center is a candidate, check for air vacuum center
-        if (getBlockTypeIdFromResult(result, 0, 1, 0).fullName().equals("org/konstructs/vacuum")) {
-            dirtBlocksToGrow.add(getPositionFromResult(result, 0, 1, 0));
-        }
-
-        // The x side
-        boolean vacuumAbove = false;
-        for (int h = 1; h > -1; h--) {
-            if (getBlockTypeIdFromResult(result, 1, h, 0).fullName().equals("org/konstructs/vacuum")) {
-                vacuumAbove = true;
-            } else {
-                if (vacuumAbove && getBlockTypeIdFromResult(result, 1, h, 0).fullName().equals("org/konstructs/dirt")) {
-                    Position pos = getPositionFromResult(result, 1, h, 0);
-                    putBlock(pos, Block.create(new BlockTypeId("org/konstructs", "brick")));
+        for (int y=1; y <= 2; y++) {
+            for (int x = 1; x <= 3; x++) {
+                for (int z = 1; z <= 3; z++) {
+                    if (candidateToGrow(result, x, y, z)) {
+                        dirtBlocksToGrow.add(getPositionFromResult(result, x, y, z));
+                    }
                 }
-                vacuumAbove = false;
             }
         }
-
-
     }
 
+    /**
+     * This function validates candidates. A dirt block with a vacuum block above.
+     */
+    private boolean candidateToGrow(BoxQueryResult result, int x, int y, int z) {
+        if (!getBlockTypeIdFromResult(result, x, y+1, z).equals(new BlockTypeId("org/konstructs", "vacuum")))
+            return false;
+        if (!getBlockTypeIdFromResult(result, x, y, z).equals(new BlockTypeId("org/konstructs", "dirt")))
+            return false;
+        return true;
+    }
+
+    /**
+     * This function returns the BlockTypeId from the result.
+     */
     private BlockTypeId getBlockTypeIdFromResult(BoxQueryResult result, int x, int y, int z) {
-        return result.result().data().get(result.result().box().index(x + 2, y + 2, z + 2));
+        return result.result().data().get(result.result().box().index(x, y, z));
     }
 
+    /**
+     * This function returns the blocks real world Position from the result.
+     */
     private Position getPositionFromResult(BoxQueryResult result, int x, int y, int z) {
-
-        Position middle = new Position(
-                result.result().box().start().x() + 2,
-                result.result().box().start().y() + 2,
-                result.result().box().start().z() + 2
-        );
-
         return new Position(
-                middle.x() + x,
-                middle.y() + y,
-                middle.z() + z
+                result.result().box().start().x() + x,
+                result.result().box().start().y() + y,
+                result.result().box().start().z() + z
         );
     }
-
 
     /**
      * This method picks a random item from the dirt block list and replaces
      * it with a grass block.
      */
     private void processDirtBlock() {
+
         if (dirtBlocksToGrow.size() > 0) {
             int pos = (int) (Math.random() * dirtBlocksToGrow.size());
             growDirtBlock(dirtBlocksToGrow.get(pos));
             dirtBlocksToGrow.remove(pos);
         }
 
-        // Schedule another ProcessDirtBlock in 2 seconds
-        scheduleSelfOnce(new ProcessDirtBlock(), 2000);
+        // Schedule another ProcessDirtBlock in 2 to 4 seconds
+        scheduleSelfOnce(new ProcessDirtBlock(), 2000 + (int)(Math.random() * 2000));
     }
 
     /**
-     * Ready to grow a block (turn a dirt block to a grass block), use the ReplaceBlockIf
-     * massage to make sure the location still contains a dirt block. If this fails, we will
-     * get a message back, for our use case that do not matter so we will ignore it.
+     * Ready to grow a block (turn a dirt block to a grass block), use a BlockFilter
+     * to make sure that it's a dirt block still there.
      */
     private void growDirtBlock(Position pos) {
-        Block target_type = Block.create(new BlockTypeId("org/konstructs", "grass-dirt"));
-        Block source_type = Block.create(new BlockTypeId("org/konstructs", "dirt"));
-        getUniverse().tell(new ReplaceBlockIf(pos, target_type, source_type), getSelf());
+        replaceBlock(pos,
+                new BlockTypeId("org/konstructs", "grass-dirt"),
+                BlockFilterFactory
+                        .withNamespace("org/konstructs")
+                        .withName("dirt")
+        );
     }
 
     /**
