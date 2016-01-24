@@ -68,16 +68,8 @@ public class GrassActor extends KonstructsActor {
 
             if (block.getValue().name().equals("grass-dirt")) {
                 boxQuery(
-                        new Position(
-                                block.getKey().x() - 2,
-                                block.getKey().y() - 2,
-                                block.getKey().z() - 2
-                        ),
-                        new Position(
-                                block.getKey().x() + 2,
-                                block.getKey().y() + 2,
-                                block.getKey().z() + 2
-                        )
+                        block.getKey().dec(new Position(2, 2, 2)),
+                        block.getKey().inc(new Position(2, 2, 2))
                 );
             }
         }
