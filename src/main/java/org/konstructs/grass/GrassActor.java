@@ -7,6 +7,7 @@ import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class GrassActor extends KonstructsActor {
 
@@ -61,25 +62,25 @@ public class GrassActor extends KonstructsActor {
      */
     @Override
     public void onEventBlockUpdated(EventBlockUpdated blockEvent) {
+        for (Map.Entry<Position, BlockTypeId> block : blockEvent.blocks().entrySet()) {
+            if (!block.getValue().namespace().equals("org/konstructs"))
+                return;
 
-        if (!blockEvent.block().type().namespace().equals("org/konstructs"))
-            return;
-
-        if (blockEvent.block().type().name().equals("grass-dirt")) {
-            boxQuery(
-                    new Position(
-                            blockEvent.pos().x() - 2,
-                            blockEvent.pos().y() - 2,
-                            blockEvent.pos().z() - 2
-                    ),
-                    new Position(
-                            blockEvent.pos().x() + 2,
-                            blockEvent.pos().y() + 2,
-                            blockEvent.pos().z() + 2
-                    )
-            );
+            if (block.getValue().name().equals("grass-dirt")) {
+                boxQuery(
+                        new Position(
+                                block.getKey().x() - 2,
+                                block.getKey().y() - 2,
+                                block.getKey().z() - 2
+                        ),
+                        new Position(
+                                block.getKey().x() + 2,
+                                block.getKey().y() + 2,
+                                block.getKey().z() + 2
+                        )
+                );
+            }
         }
-
     }
 
     /**
