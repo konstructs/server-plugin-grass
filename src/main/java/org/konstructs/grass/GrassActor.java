@@ -81,44 +81,21 @@ public class GrassActor extends KonstructsActor {
      */
     @Override
     public void onBoxQueryResult(BoxQueryResult result) {
-        for (int y=1; y <= 2; y++) {
-            for (int x = 1; x <= 3; x++) {
-                for (int z = 1; z <= 3; z++) {
-                    if (candidateToGrow(result, x, y, z)) {
-                        dirtBlocksToGrow.add(getPositionFromResult(result, x, y, z));
-                    }
-                }
-            }
+
+        for(Map.Entry<Position, BlockTypeId> p: result.result().toPlaced().entrySet()) {
+
+            if (!result.result().box().contains(p.getKey().incY(1)))
+                continue;
+
+            BlockTypeId top = result.result().get(p.getKey().incY(1));
+            if (!top.equals(new BlockTypeId("org/konstructs", "vacuum")))
+                continue;
+            if (!p.getValue().equals(new BlockTypeId("org/konstructs", "dirt")))
+                continue;
+
+            dirtBlocksToGrow.add(p.getKey());
         }
-    }
 
-    /**
-     * This function validates candidates. A dirt block with a vacuum block above.
-     */
-    private boolean candidateToGrow(BoxQueryResult result, int x, int y, int z) {
-        if (!getBlockTypeIdFromResult(result, x, y+1, z).equals(new BlockTypeId("org/konstructs", "vacuum")))
-            return false;
-        if (!getBlockTypeIdFromResult(result, x, y, z).equals(new BlockTypeId("org/konstructs", "dirt")))
-            return false;
-        return true;
-    }
-
-    /**
-     * This function returns the BlockTypeId from the result.
-     */
-    private BlockTypeId getBlockTypeIdFromResult(BoxQueryResult result, int x, int y, int z) {
-        return result.result().data().get(result.result().box().index(x, y, z));
-    }
-
-    /**
-     * This function returns the blocks real world Position from the result.
-     */
-    private Position getPositionFromResult(BoxQueryResult result, int x, int y, int z) {
-        return new Position(
-                result.result().box().start().x() + x,
-                result.result().box().start().y() + y,
-                result.result().box().start().z() + z
-        );
     }
 
     /**
