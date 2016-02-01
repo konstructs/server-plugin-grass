@@ -37,23 +37,12 @@ public class GrassActor extends KonstructsActor {
     @Override
     public void onReceive(Object message) {
 
-        if (message instanceof EventBlockUpdated) {
-            onEventBlockUpdated((EventBlockUpdated)message);
-            return;
-        }
-
-        if (message instanceof BoxQueryResult) {
-            onBoxQueryResult((BoxQueryResult)message);
-            return;
-        }
-
         if (message instanceof ProcessDirtBlock) {
             processDirtBlock();
             return;
         }
 
-        // Print out unhandled messages
-        //System.out.println(getSelf().path() + " got and unhandled message: " + message);
+        super.onReceive(message); // Handle konstructs messages
     }
 
     /**
@@ -68,8 +57,8 @@ public class GrassActor extends KonstructsActor {
 
             if (block.getValue().name().equals("grass-dirt")) {
                 boxQuery(
-                        block.getKey().dec(new Position(2, 2, 2)),
-                        block.getKey().inc(new Position(2, 2, 2))
+                        block.getKey().dec(new Position(1, 10, 1)),
+                        block.getKey().inc(new Position(2, 10, 2))
                 );
             }
         }
@@ -82,13 +71,12 @@ public class GrassActor extends KonstructsActor {
     @Override
     public void onBoxQueryResult(BoxQueryResult result) {
 
-        for(Map.Entry<Position, BlockTypeId> p: result.result().toPlaced().entrySet()) {
+        Map<Position, BlockTypeId> placed = result.result().toPlaced();
 
-            if (!result.result().box().contains(p.getKey().incY(1)))
-                continue;
+        for(Map.Entry<Position, BlockTypeId> p: placed.entrySet()) {
 
-            BlockTypeId top = result.result().get(p.getKey().incY(1));
-            if (!top.equals(new BlockTypeId("org/konstructs", "vacuum")))
+            BlockTypeId top = placed.get(p.getKey().incY(1));
+            if (top == null || !top.equals(BlockTypeId.vacuum()))
                 continue;
             if (!p.getValue().equals(new BlockTypeId("org/konstructs", "dirt")))
                 continue;
