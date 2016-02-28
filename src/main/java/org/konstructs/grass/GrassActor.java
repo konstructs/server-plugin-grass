@@ -45,6 +45,9 @@ public class GrassActor extends KonstructsActor {
         super.onReceive(message); // Handle konstructs messages
     }
 
+    @Override
+    public void onEventBlockRemoved(EventBlockRemoved block) {}
+
     /**
      * Events related to block placements/updates. We filter out grass placements
      * and triggers a boxQuery(..) lookup around the placed block.
