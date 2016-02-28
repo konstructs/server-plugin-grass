@@ -126,8 +126,8 @@ public class GrassActor extends KonstructsActor {
             dirtBlocksToGrow.remove(pos);
         }
 
-        // Schedule another ProcessDirtBlock in 2s - queue size seconds (min 10ms delay)
-        int next_tick = Math.max(10, 2000 - dirtBlocksToGrow.size());
+        // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 10ms delay)
+        int next_tick = Math.max(10, 500 - dirtBlocksToGrow.size());
         scheduleSelfOnce(new ProcessDirtBlock(), next_tick);
     }
 
