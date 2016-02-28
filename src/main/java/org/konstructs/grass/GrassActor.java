@@ -60,8 +60,8 @@ public class GrassActor extends KonstructsActor {
 
             if (block.getValue().name().equals("grass-dirt")) {
                 boxQuery(
-                        block.getKey().dec(new Position(1, 10, 1)),
-                        block.getKey().inc(new Position(2, 10, 2))
+                        block.getKey().dec(new Position(1, 1, 1)), // from
+                        block.getKey().inc(new Position(2, 3, 2))  // until
                 );
             }
         }
@@ -74,17 +74,42 @@ public class GrassActor extends KonstructsActor {
     @Override
     public void onBoxQueryResult(BoxQueryResult result) {
 
-        Map<Position, BlockTypeId> placed = result.result().toPlaced();
+        // Expect a 3x4x3 box
+        if (result.result().data().size() != 3*4*3) {
+            System.out.println("onBoxQueryResult: Error: Got a box with size " + result.result().data().size());
+            return;
+        }
 
-        for(Map.Entry<Position, BlockTypeId> p: placed.entrySet()) {
+        Position start = result.result().box().start();
 
-            BlockTypeId top = placed.get(p.getKey().incY(1));
-            if (top == null || !top.equals(BlockTypeId.vacuum()))
-                continue;
-            if (!p.getValue().equals(new BlockTypeId("org/konstructs", "dirt")))
-                continue;
+        int[] checkPos = {
+                0, 1, // N corner
+                1, 2, // E corner
+                2, 1, // S corner
+                1, 0  // W corner
+        };
 
-            dirtBlocksToGrow.add(p.getKey());
+        for (int i=0; i<checkPos.length; i+=2) {
+            int x = checkPos[i];
+            int y = checkPos[i+1];
+
+            // From top down
+            for(int h=3; h>=0; h--) {
+
+                BlockTypeId typeId = result.result().get(x, h, y);
+
+                // Found vacuum, continue
+                if (typeId.equals(new BlockTypeId("org/konstructs", "vacuum"))) continue;
+
+                // Found dirt, add to list and stop search
+                if (typeId.equals(new BlockTypeId("org/konstructs", "dirt"))) {
+                    if (h < 3) { // Never allow the 1st layer, we requested it to check for vacuum
+                        dirtBlocksToGrow.add(start.inc(new Position(x, h, y)));
+                    }
+                }
+
+                break; // Found non-dirt block, abort
+            }
         }
 
     }
