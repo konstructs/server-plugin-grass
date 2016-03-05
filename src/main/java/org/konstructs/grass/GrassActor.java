@@ -2,7 +2,9 @@ package org.konstructs.grass;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import com.typesafe.config.ConfigValue;
 import konstructs.api.*;
+import konstructs.plugin.Config;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
 
@@ -16,20 +18,44 @@ public class GrassActor extends KonstructsActor {
 
     private ArrayList<QueuedGrassBlock> dirtBlocksToGrow;
     private ArrayList<BlockTypeId> validGrassBlocks;
+    private ArrayList<BlockTypeId> growsOn;
+    private ArrayList<BlockTypeId> growsUnder;
+
+    private BlockFilter blockFilter;
 
     /**
      * The superclass is provided by the API and contains
      * a few convenient methods. This class constructor
      * receives the value provided in props()
      */
-    public GrassActor(ActorRef universe) {
+    public GrassActor(ActorRef universe,
+                      com.typesafe.config.Config config,
+                      com.typesafe.config.Config grow,
+                      com.typesafe.config.Config under) {
         super(universe);
-        dirtBlocksToGrow = new ArrayList<QueuedGrassBlock>();
 
+        dirtBlocksToGrow = new ArrayList<QueuedGrassBlock>();
         validGrassBlocks = new ArrayList<BlockTypeId>();
-        validGrassBlocks.add(new BlockTypeId("org/konstructs","grass-dirt"));
-        validGrassBlocks.add(new BlockTypeId("org/konstructs/grass","warm"));
-        validGrassBlocks.add(new BlockTypeId("org/konstructs/grass","autumn"));
+        growsOn = new ArrayList<BlockTypeId>();
+        growsUnder = new ArrayList<BlockTypeId>();
+
+        for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
+            validGrassBlocks.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
+        }
+
+        for (Map.Entry<String, ConfigValue> e : grow.entrySet()) {
+            growsOn.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
+        }
+
+        for (Map.Entry<String, ConfigValue> e : under.entrySet()) {
+            growsUnder.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
+        }
+
+        // Create a block filter used in growDirtBlock(..)
+        blockFilter = BlockFilterFactory.empty();
+        for (BlockTypeId bt : growsOn) {
+            blockFilter = blockFilter.or(BlockFilterFactory.withBlockTypeId(bt));
+        }
 
         // Schedule a ProcessDirtBlock in 2 seconds
         scheduleSelfOnce(new ProcessDirtBlock(), 2000);
@@ -55,8 +81,8 @@ public class GrassActor extends KonstructsActor {
     public void onEventBlockRemoved(EventBlockRemoved block) {}
 
     /**
-     * Events related to block placements/updates. We filter out grass placements
-     * and triggers a boxQuery(..) lookup around the placed block.
+     * Events related to block placements/updates. We filter out grass and dirt
+     * placements and triggers a boxQuery(..) lookup around the placed block.
      */
     @Override
     public void onEventBlockUpdated(EventBlockUpdated blockEvent) {
@@ -64,10 +90,8 @@ public class GrassActor extends KonstructsActor {
 
             BlockTypeId blockTypeId = block.getValue();
 
-            // If grass, dirt or a block form this plugin
-            if (blockTypeId.equals(new BlockTypeId("org/konstructs", "grass-dirt"))
-                    || blockTypeId.equals(new BlockTypeId("org/konstructs", "dirt"))
-                    || blockTypeId.namespace().equals("org/konstructs/grass")) {
+            // If grass or dirt
+            if (growsOn.contains(blockTypeId) || validGrassBlocks.contains(blockTypeId)) {
 
                 boxQuery(
                         block.getKey().dec(new Position(1, 1, 1)), // from
@@ -101,7 +125,7 @@ public class GrassActor extends KonstructsActor {
         };
 
         // Center is dirt, look around for grass blocks
-        if(blockIdToGrow.equals(new BlockTypeId("org/konstructs", "dirt"))) {
+        if(growsOn.contains(blockIdToGrow)) {
 
             for (int i=0; i<checkPos.length; i+=2) {
                 int x = checkPos[i];
@@ -133,10 +157,10 @@ public class GrassActor extends KonstructsActor {
                 BlockTypeId typeId = result.result().get(x, h, y);
 
                 // Found vacuum, continue
-                if (typeId.equals(new BlockTypeId("org/konstructs", "vacuum"))) continue;
+                if (growsUnder.contains(typeId)) continue;
 
                 // Found dirt, add to list and stop search
-                if (typeId.equals(new BlockTypeId("org/konstructs", "dirt"))) {
+                if (growsOn.contains(typeId)) {
                     if (h < 3) { // Never allow the 1st layer, we requested it to check for vacuum
 
                         if (Math.random() < 0.005) {
@@ -184,24 +208,25 @@ public class GrassActor extends KonstructsActor {
      * to make sure that it's a dirt block still there.
      */
     private void growDirtBlock(QueuedGrassBlock block) {
-        replaceBlock(block.getPosition(), block.getType(),
-                BlockFilterFactory
-                        .withNamespace("org/konstructs")
-                        .withName("dirt")
-        );
+        replaceBlock(block.getPosition(), block.getType(), blockFilter);
     }
 
     /**
      * This is the plugin constructor called by the actor system to register the
-     * actor. This configures what type of data are provided to this actor. In this
-     * case only the default parameters are provided, the plugin name and universe.
+     * actor. This configures what type of data are provided to this actor.
+     * The configuration key "types" is stored in reference.conf
      *
      * @param pluginName        The name of our plugin
      * @param universe          A reference to the universe actor.
      */
     @PluginConstructor
-    public static Props props(String pluginName, ActorRef universe) {
+    public static Props props(String pluginName,
+                              ActorRef universe,
+                              @Config(key = "types") com.typesafe.config.Config types,
+                              @Config(key = "grows-on") com.typesafe.config.Config grow,
+                              @Config(key = "grows-under") com.typesafe.config.Config under){
+
         Class currentClass = new Object() { }.getClass().getEnclosingClass();
-        return Props.create(currentClass, universe);
+        return Props.create(currentClass, universe, types, grow, under);
     }
 }
