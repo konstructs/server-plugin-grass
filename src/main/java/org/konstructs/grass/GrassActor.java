@@ -14,7 +14,8 @@ public class GrassActor extends KonstructsActor {
     // Message classes sent to the actor
     class ProcessDirtBlock {}
 
-    private ArrayList<Position> dirtBlocksToGrow;
+    private ArrayList<QueuedGrassBlock> dirtBlocksToGrow;
+    private ArrayList<BlockTypeId> validGrassBlocks;
 
     /**
      * The superclass is provided by the API and contains
@@ -23,7 +24,12 @@ public class GrassActor extends KonstructsActor {
      */
     public GrassActor(ActorRef universe) {
         super(universe);
-        dirtBlocksToGrow = new ArrayList<Position>();
+        dirtBlocksToGrow = new ArrayList<QueuedGrassBlock>();
+
+        validGrassBlocks = new ArrayList<BlockTypeId>();
+        validGrassBlocks.add(new BlockTypeId("org/konstructs","grass-dirt"));
+        validGrassBlocks.add(new BlockTypeId("org/konstructs/grass","warm"));
+        validGrassBlocks.add(new BlockTypeId("org/konstructs/grass","autumn"));
 
         // Schedule a ProcessDirtBlock in 2 seconds
         scheduleSelfOnce(new ProcessDirtBlock(), 2000);
@@ -55,10 +61,14 @@ public class GrassActor extends KonstructsActor {
     @Override
     public void onEventBlockUpdated(EventBlockUpdated blockEvent) {
         for (Map.Entry<Position, BlockTypeId> block : blockEvent.blocks().entrySet()) {
-            if (!block.getValue().namespace().equals("org/konstructs"))
-                return;
 
-            if (block.getValue().name().equals("grass-dirt")) {
+            BlockTypeId blockTypeId = block.getValue();
+
+            // If grass, dirt or a block form this plugin
+            if (blockTypeId.equals(new BlockTypeId("org/konstructs", "grass-dirt"))
+                    || blockTypeId.equals(new BlockTypeId("org/konstructs", "dirt"))
+                    || blockTypeId.namespace().equals("org/konstructs/grass")) {
+
                 boxQuery(
                         block.getKey().dec(new Position(1, 1, 1)), // from
                         block.getKey().inc(new Position(2, 3, 2))  // until
@@ -81,6 +91,7 @@ public class GrassActor extends KonstructsActor {
         }
 
         Position start = result.result().box().start();
+        BlockTypeId blockIdToGrow = result.result().get(1, 1, 1); // Get center block
 
         int[] checkPos = {
                 0, 1, // N corner
@@ -89,6 +100,29 @@ public class GrassActor extends KonstructsActor {
                 1, 0  // W corner
         };
 
+        // Center is dirt, look around for grass blocks
+        if(blockIdToGrow.equals(new BlockTypeId("org/konstructs", "dirt"))) {
+
+            for (int i=0; i<checkPos.length; i+=2) {
+                int x = checkPos[i];
+                int y = checkPos[i + 1];
+
+                // From top down
+                for (int h = 3; h >= 0; h--) {
+                    BlockTypeId typeId = result.result().get(x, h, y);
+                    if (validGrassBlocks.contains(typeId)) {
+                        dirtBlocksToGrow.add(new QueuedGrassBlock(
+                                start.inc(new Position(x, h, y)),
+                                typeId)
+                        );
+                    }
+                }
+            }
+
+            return;
+        }
+
+        // Center is grass, look around for dirt blocks
         for (int i=0; i<checkPos.length; i+=2) {
             int x = checkPos[i];
             int y = checkPos[i+1];
@@ -104,7 +138,16 @@ public class GrassActor extends KonstructsActor {
                 // Found dirt, add to list and stop search
                 if (typeId.equals(new BlockTypeId("org/konstructs", "dirt"))) {
                     if (h < 3) { // Never allow the 1st layer, we requested it to check for vacuum
-                        dirtBlocksToGrow.add(start.inc(new Position(x, h, y)));
+
+                        if (Math.random() < 0.005) {
+                            // Get a new random grass block
+                            blockIdToGrow = getRandomBlockTypeId();
+                        }
+
+                        dirtBlocksToGrow.add(new QueuedGrassBlock(
+                                start.inc(new Position(x, h, y)),
+                                blockIdToGrow)
+                        );
                     }
                 }
 
@@ -112,6 +155,11 @@ public class GrassActor extends KonstructsActor {
             }
         }
 
+    }
+
+    private BlockTypeId getRandomBlockTypeId() {
+        int pos = (int) (Math.random() * validGrassBlocks.size());
+        return validGrassBlocks.get(pos);
     }
 
     /**
@@ -135,9 +183,8 @@ public class GrassActor extends KonstructsActor {
      * Ready to grow a block (turn a dirt block to a grass block), use a BlockFilter
      * to make sure that it's a dirt block still there.
      */
-    private void growDirtBlock(Position pos) {
-        replaceBlock(pos,
-                new BlockTypeId("org/konstructs", "grass-dirt"),
+    private void growDirtBlock(QueuedGrassBlock block) {
+        replaceBlock(block.getPosition(), block.getType(),
                 BlockFilterFactory
                         .withNamespace("org/konstructs")
                         .withName("dirt")
