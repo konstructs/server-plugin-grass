@@ -4,11 +4,14 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import com.typesafe.config.ConfigValue;
 import konstructs.api.*;
+import konstructs.api.messages.BlockUpdateEvent;
+import konstructs.api.messages.BoxQueryResult;
 import konstructs.plugin.Config;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 
 public class GrassActor extends KonstructsActor {
@@ -34,10 +37,10 @@ public class GrassActor extends KonstructsActor {
                       com.typesafe.config.Config under) {
         super(universe);
 
-        dirtBlocksToGrow = new ArrayList<QueuedGrassBlock>();
-        validGrassBlocks = new ArrayList<BlockTypeId>();
-        growsOn = new ArrayList<BlockTypeId>();
-        growsUnder = new ArrayList<BlockTypeId>();
+        dirtBlocksToGrow = new ArrayList<>();
+        validGrassBlocks = new ArrayList<>();
+        growsOn = new ArrayList<>();
+        growsUnder = new ArrayList<>();
 
         for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
             validGrassBlocks.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
@@ -52,7 +55,7 @@ public class GrassActor extends KonstructsActor {
         }
 
         // Create a block filter used in growDirtBlock(..)
-        blockFilter = BlockFilterFactory.empty();
+        blockFilter = BlockFilterFactory.EMPTY;
         for (BlockTypeId bt : growsOn) {
             blockFilter = blockFilter.or(BlockFilterFactory.withBlockTypeId(bt));
         }
@@ -77,26 +80,21 @@ public class GrassActor extends KonstructsActor {
         super.onReceive(message); // Handle konstructs messages
     }
 
-    @Override
-    public void onEventBlockRemoved(EventBlockRemoved block) {}
-
     /**
      * Events related to block placements/updates. We filter out grass and dirt
      * placements and triggers a boxQuery(..) lookup around the placed block.
      */
     @Override
-    public void onEventBlockUpdated(EventBlockUpdated blockEvent) {
-        for (Map.Entry<Position, BlockTypeId> block : blockEvent.blocks().entrySet()) {
-
-            BlockTypeId blockTypeId = block.getValue();
+    public void onBlockUpdateEvent(BlockUpdateEvent blockEvent) {
+        for (Map.Entry<Position, BlockUpdate> block : blockEvent.getUpdatedBlocks().entrySet()) {
+            BlockUpdate blockUpdate = block.getValue();
+            BlockTypeId blockTypeId = blockUpdate.getAfter().getType();
 
             // If grass or dirt
             if (growsOn.contains(blockTypeId) || validGrassBlocks.contains(blockTypeId)) {
-
-                boxQuery(
-                        block.getKey().dec(new Position(1, 1, 1)), // from
-                        block.getKey().inc(new Position(2, 3, 2))  // until
-                );
+                Position from = block.getKey().subtract(new Position(1, 1, 1));
+                Box reqBox = Box.createWithSize(from, new Position(3, 4, 3));
+                boxQuery(reqBox);
             }
         }
     }
@@ -109,13 +107,13 @@ public class GrassActor extends KonstructsActor {
     public void onBoxQueryResult(BoxQueryResult result) {
 
         // Expect a 3x4x3 box
-        if (result.result().data().size() != 3*4*3) {
-            System.out.println("onBoxQueryResult: Error: Got a box with size " + result.result().data().size());
+        if (result.getBlocks().length != 3*4*3) {
+            System.out.println("onBoxQueryResult: Error: Got a box with size " + result.getBlocks().length);
             return;
         }
 
-        Position start = result.result().box().start();
-        BlockTypeId blockIdToGrow = result.result().get(1, 1, 1); // Get center block
+        Position start = result.getBox().getFrom();
+        BlockTypeId blockIdToGrow = result.getLocal(new Position(1, 1, 1)); // Get center block
 
         int[] checkPos = {
                 0, 1, // N corner
@@ -133,10 +131,10 @@ public class GrassActor extends KonstructsActor {
 
                 // From top down
                 for (int h = 3; h >= 0; h--) {
-                    BlockTypeId typeId = result.result().get(x, h, y);
+                    BlockTypeId typeId = result.getLocal(new Position(x, h, y));
                     if (validGrassBlocks.contains(typeId)) {
                         dirtBlocksToGrow.add(new QueuedGrassBlock(
-                                start.inc(new Position(x, h, y)),
+                                start.add(new Position(x, h, y)),
                                 typeId)
                         );
                     }
@@ -154,7 +152,7 @@ public class GrassActor extends KonstructsActor {
             // From top down
             for(int h=3; h>=0; h--) {
 
-                BlockTypeId typeId = result.result().get(x, h, y);
+                BlockTypeId typeId = result.getLocal(new Position(x, h, y));
 
                 // Found vacuum, continue
                 if (growsUnder.contains(typeId)) continue;
@@ -169,7 +167,7 @@ public class GrassActor extends KonstructsActor {
                         }
 
                         dirtBlocksToGrow.add(new QueuedGrassBlock(
-                                start.inc(new Position(x, h, y)),
+                                start.add(new Position(x, h, y)),
                                 blockIdToGrow)
                         );
                     }
@@ -208,7 +206,9 @@ public class GrassActor extends KonstructsActor {
      * to make sure that it's a dirt block still there.
      */
     private void growDirtBlock(QueuedGrassBlock block) {
-        replaceBlock(block.getPosition(), block.getType(), blockFilter);
+        Map<Position, BlockTypeId> blocks = new HashMap<>();
+        blocks.put(block.getPosition(), block.getType());
+        replaceBlocks(blockFilter, blocks);
     }
 
     /**
