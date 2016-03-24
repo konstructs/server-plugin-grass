@@ -55,7 +55,7 @@ public class GrassActor extends KonstructsActor {
         }
 
         // Create a block filter used in growDirtBlock(..)
-        blockFilter = BlockFilterFactory.EMPTY;
+        blockFilter = BlockFilterFactory.NOTHING;
         for (BlockTypeId bt : growsOn) {
             blockFilter = blockFilter.or(BlockFilterFactory.withBlockTypeId(bt));
         }
