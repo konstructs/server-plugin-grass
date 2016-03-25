@@ -2,12 +2,11 @@ apply plugin: 'java'
 
 repositories {
     mavenCentral()
-    mavenLocal()
     maven {
         url "https://dl.bintray.com/konstructs/maven"
     }
 }
 
 dependencies {
-    compile group: 'org.konstructs', name: 'konstructs-server_2.10', version: '0.1.13'
+    compile group: 'org.konstructs', name: 'konstructs-server-api', version: '0.1.1'
 }
