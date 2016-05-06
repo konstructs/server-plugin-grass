@@ -10,10 +10,12 @@ import konstructs.api.messages.GlobalConfig;
 import konstructs.plugin.Config;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
+import scala.concurrent.duration.Duration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class GrassActor extends KonstructsActor {
 
@@ -210,8 +212,11 @@ public class GrassActor extends KonstructsActor {
         }
 
         // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 1ms delay)
-        int next_tick = Math.max(1, (int)(500 / simulation_speed) - dirtBlocksToGrow.size());
-        scheduleSelfOnce(new ProcessDirtBlock(), next_tick);
+        int next_tick = Math.max(1, (int)(500000 / simulation_speed) - dirtBlocksToGrow.size() * 1000);
+
+        getContext().system().scheduler().scheduleOnce(
+                Duration.create(next_tick, TimeUnit.MICROSECONDS),
+                getSelf(), new ProcessDirtBlock(), getContext().system().dispatcher(), null);
     }
 
     /**
