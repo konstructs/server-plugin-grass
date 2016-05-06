@@ -26,6 +26,8 @@ public class GrassActor extends KonstructsActor {
 
     private BlockFilter blockFilter;
 
+    private float simulation_speed;
+
     /**
      * The superclass is provided by the API and contains
      * a few convenient methods. This class constructor
@@ -41,6 +43,8 @@ public class GrassActor extends KonstructsActor {
         validGrassBlocks = new ArrayList<>();
         growsOn = new ArrayList<>();
         growsUnder = new ArrayList<>();
+
+        simulation_speed = 1;
 
         for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
             validGrassBlocks.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
@@ -61,7 +65,7 @@ public class GrassActor extends KonstructsActor {
         }
 
         // Schedule a ProcessDirtBlock in 2 seconds
-        scheduleSelfOnce(new ProcessDirtBlock(), 2000);
+        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
     }
 
     /**
@@ -196,8 +200,8 @@ public class GrassActor extends KonstructsActor {
             dirtBlocksToGrow.remove(pos);
         }
 
-        // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 10ms delay)
-        int next_tick = Math.max(10, 500 - dirtBlocksToGrow.size());
+        // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 1ms delay)
+        int next_tick = Math.max(1, (int)(500 / simulation_speed) - dirtBlocksToGrow.size());
         scheduleSelfOnce(new ProcessDirtBlock(), next_tick);
     }
 

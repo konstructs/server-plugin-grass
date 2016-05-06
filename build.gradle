@@ -8,5 +8,5 @@ repositories {
 }
 
 dependencies {
-    compile group: 'org.konstructs', name: 'konstructs-server-api', version: '0.1.1'
+    compile group: 'org.konstructs', name: 'konstructs-server-api', version: '0.1.6'
 }
