@@ -14,6 +14,7 @@ import scala.concurrent.duration.Duration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -207,8 +208,15 @@ public class GrassActor extends KonstructsActor {
 
         if (dirtBlocksToGrow.size() > 0) {
             int pos = (int) (Math.random() * dirtBlocksToGrow.size());
-            growDirtBlock(dirtBlocksToGrow.get(pos));
-            dirtBlocksToGrow.remove(pos);
+            QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
+            growDirtBlock(block);
+
+            for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
+                QueuedGrassBlock qblock = it.next();
+                if (qblock.getPosition().equals(block.getPosition())) {
+                    it.remove();
+                }
+            }
         }
 
         // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 1ms delay)
