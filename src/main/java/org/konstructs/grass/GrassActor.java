@@ -206,7 +206,7 @@ public class GrassActor extends KonstructsActor {
      */
     private void processDirtBlock() {
 
-        int process_num_blocks = (int)(dirtBlocksToGrow.size() * 0.1 + 1 * simulation_speed);
+        int process_num_blocks = Math.max(1, (int)(dirtBlocksToGrow.size() * 0.1));
 
         if (dirtBlocksToGrow.size() > process_num_blocks) {
             for (int i = process_num_blocks; i > 0; i--) {
