@@ -25,6 +25,8 @@ public class GrassActor extends KonstructsActor {
     private ArrayList<BlockTypeId> validGrassBlocks;
     private ArrayList<BlockTypeId> growsOn;
     private ArrayList<BlockTypeId> growsUnder;
+    private float change_rate;
+    private float default_tick_speed;
 
     private BlockFilter blockFilter;
 
@@ -38,7 +40,9 @@ public class GrassActor extends KonstructsActor {
     public GrassActor(ActorRef universe,
                       com.typesafe.config.Config config,
                       com.typesafe.config.Config grow,
-                      com.typesafe.config.Config under) {
+                      com.typesafe.config.Config under,
+                      int change_rate,
+                      int default_tick_speed) {
         super(universe);
 
         dirtBlocksToGrow = new ArrayList<>();
@@ -47,6 +51,9 @@ public class GrassActor extends KonstructsActor {
         growsUnder = new ArrayList<>();
 
         simulation_speed = 1;
+
+        this.change_rate = ((float)change_rate) / 10000;
+        this.default_tick_speed = default_tick_speed;
 
         for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
             validGrassBlocks.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
@@ -67,7 +74,8 @@ public class GrassActor extends KonstructsActor {
         }
 
         // Schedule a ProcessDirtBlock in 2 seconds
-        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
+        scheduleSelfOnce(new ProcessDirtBlock(),
+                (int)(this.default_tick_speed / simulation_speed));
     }
 
     /**
@@ -175,7 +183,7 @@ public class GrassActor extends KonstructsActor {
                 if (growsOn.contains(typeId)) {
                     if (h < 3) { // Never allow the 1st layer, we requested it to check for vacuum
 
-                        if (Math.random() < 0.005) {
+                        if (Math.random() < this.change_rate) {
                             // Get a new random grass block
                             blockIdToGrow = getRandomBlockTypeId();
                         }
@@ -224,7 +232,8 @@ public class GrassActor extends KonstructsActor {
         }
 
         replaceBlocks(blockFilter, blocks);
-        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
+        scheduleSelfOnce(new ProcessDirtBlock(),
+                (int)(this.default_tick_speed / simulation_speed));
     }
 
     /**
@@ -240,9 +249,12 @@ public class GrassActor extends KonstructsActor {
                               ActorRef universe,
                               @Config(key = "types") com.typesafe.config.Config types,
                               @Config(key = "grows-on") com.typesafe.config.Config grow,
-                              @Config(key = "grows-under") com.typesafe.config.Config under){
+                              @Config(key = "grows-under") com.typesafe.config.Config under,
+                              @Config(key = "change-rate") int change_rate,
+                              @Config(key = "default-tick-speed") int default_tick_speed){
 
         Class currentClass = new Object() { }.getClass().getEnclosingClass();
-        return Props.create(currentClass, universe, types, grow, under);
+        return Props.create(currentClass, universe, types, grow, under, change_rate,
+                            default_tick_speed);
     }
 }
