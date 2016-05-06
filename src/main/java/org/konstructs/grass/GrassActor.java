@@ -6,13 +6,17 @@ import com.typesafe.config.ConfigValue;
 import konstructs.api.*;
 import konstructs.api.messages.BlockUpdateEvent;
 import konstructs.api.messages.BoxQueryResult;
+import konstructs.api.messages.GlobalConfig;
 import konstructs.plugin.Config;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
+import scala.concurrent.duration.Duration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class GrassActor extends KonstructsActor {
 
@@ -25,6 +29,8 @@ public class GrassActor extends KonstructsActor {
     private ArrayList<BlockTypeId> growsUnder;
 
     private BlockFilter blockFilter;
+
+    private float simulation_speed;
 
     /**
      * The superclass is provided by the API and contains
@@ -41,6 +47,8 @@ public class GrassActor extends KonstructsActor {
         validGrassBlocks = new ArrayList<>();
         growsOn = new ArrayList<>();
         growsUnder = new ArrayList<>();
+
+        simulation_speed = 1;
 
         for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
             validGrassBlocks.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
@@ -61,7 +69,7 @@ public class GrassActor extends KonstructsActor {
         }
 
         // Schedule a ProcessDirtBlock in 2 seconds
-        scheduleSelfOnce(new ProcessDirtBlock(), 2000);
+        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
     }
 
     /**
@@ -78,6 +86,14 @@ public class GrassActor extends KonstructsActor {
         }
 
         super.onReceive(message); // Handle konstructs messages
+    }
+
+    /**
+     * Set tick speed
+     */
+    @Override
+    public void onGlobalConfig(GlobalConfig config) {
+        simulation_speed = config.getSimulationSpeed();
     }
 
     /**
@@ -190,25 +206,27 @@ public class GrassActor extends KonstructsActor {
      */
     private void processDirtBlock() {
 
-        if (dirtBlocksToGrow.size() > 0) {
-            int pos = (int) (Math.random() * dirtBlocksToGrow.size());
-            growDirtBlock(dirtBlocksToGrow.get(pos));
-            dirtBlocksToGrow.remove(pos);
+        int process_num_blocks = Math.max(1, (int)(dirtBlocksToGrow.size() * 0.1));
+        HashMap<Position, BlockTypeId> blocks = new HashMap<>();
+
+        if (dirtBlocksToGrow.size() > process_num_blocks) {
+            for (int i = process_num_blocks; i > 0; i--) {
+                int pos = (int) (Math.random() * dirtBlocksToGrow.size());
+                QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
+                blocks.put(block.getPosition(), block.getType());
+
+                for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
+                    QueuedGrassBlock qblock = it.next();
+                    if (qblock.getPosition().equals(block.getPosition())) {
+                        it.remove();
+                    }
+                }
+            }
+
         }
 
-        // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 10ms delay)
-        int next_tick = Math.max(10, 500 - dirtBlocksToGrow.size());
-        scheduleSelfOnce(new ProcessDirtBlock(), next_tick);
-    }
-
-    /**
-     * Ready to grow a block (turn a dirt block to a grass block), use a BlockFilter
-     * to make sure that it's a dirt block still there.
-     */
-    private void growDirtBlock(QueuedGrassBlock block) {
-        Map<Position, BlockTypeId> blocks = new HashMap<>();
-        blocks.put(block.getPosition(), block.getType());
         replaceBlocks(blockFilter, blocks);
+        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
     }
 
     /**
