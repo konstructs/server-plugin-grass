@@ -206,17 +206,22 @@ public class GrassActor extends KonstructsActor {
      */
     private void processDirtBlock() {
 
-        if (dirtBlocksToGrow.size() > 0) {
-            int pos = (int) (Math.random() * dirtBlocksToGrow.size());
-            QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
-            growDirtBlock(block);
+        int process_num_blocks = (int)(dirtBlocksToGrow.size() * 0.1 + 1 * simulation_speed);
 
-            for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
-                QueuedGrassBlock qblock = it.next();
-                if (qblock.getPosition().equals(block.getPosition())) {
-                    it.remove();
+        if (dirtBlocksToGrow.size() > process_num_blocks) {
+            for (int i = process_num_blocks; i > 0; i--) {
+                int pos = (int) (Math.random() * dirtBlocksToGrow.size());
+                QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
+                growDirtBlock(block);
+
+                for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
+                    QueuedGrassBlock qblock = it.next();
+                    if (qblock.getPosition().equals(block.getPosition())) {
+                        it.remove();
+                    }
                 }
             }
+
         }
 
         // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 1ms delay)
