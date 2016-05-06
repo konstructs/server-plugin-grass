@@ -207,12 +207,13 @@ public class GrassActor extends KonstructsActor {
     private void processDirtBlock() {
 
         int process_num_blocks = Math.max(1, (int)(dirtBlocksToGrow.size() * 0.1));
+        HashMap<Position, BlockTypeId> blocks = new HashMap<>();
 
         if (dirtBlocksToGrow.size() > process_num_blocks) {
             for (int i = process_num_blocks; i > 0; i--) {
                 int pos = (int) (Math.random() * dirtBlocksToGrow.size());
                 QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
-                growDirtBlock(block);
+                blocks.put(block.getPosition(), block.getType());
 
                 for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
                     QueuedGrassBlock qblock = it.next();
@@ -224,22 +225,14 @@ public class GrassActor extends KonstructsActor {
 
         }
 
+        replaceBlocks(blockFilter, blocks);
+
         // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 1ms delay)
         int next_tick = Math.max(1, (int)(500000 / simulation_speed) - dirtBlocksToGrow.size() * 1000);
 
         getContext().system().scheduler().scheduleOnce(
                 Duration.create(next_tick, TimeUnit.MICROSECONDS),
                 getSelf(), new ProcessDirtBlock(), getContext().system().dispatcher(), null);
-    }
-
-    /**
-     * Ready to grow a block (turn a dirt block to a grass block), use a BlockFilter
-     * to make sure that it's a dirt block still there.
-     */
-    private void growDirtBlock(QueuedGrassBlock block) {
-        Map<Position, BlockTypeId> blocks = new HashMap<>();
-        blocks.put(block.getPosition(), block.getType());
-        replaceBlocks(blockFilter, blocks);
     }
 
     /**
