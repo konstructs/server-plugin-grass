@@ -27,6 +27,7 @@ public class GrassActor extends KonstructsActor {
     private ArrayList<BlockTypeId> growsUnder;
     private float change_rate;
     private float default_tick_speed;
+    private HashMap<BlockTypeId, BlockConfig> blockConfig;
 
     private BlockFilter blockFilter;
 
@@ -49,14 +50,25 @@ public class GrassActor extends KonstructsActor {
         validGrassBlocks = new ArrayList<>();
         growsOn = new ArrayList<>();
         growsUnder = new ArrayList<>();
+        blockConfig = new HashMap<>();
 
         simulation_speed = 1;
 
         this.change_rate = ((float)change_rate) / 10000;
         this.default_tick_speed = default_tick_speed;
 
-        for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
-            validGrassBlocks.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
+        for (String k : config.root().keySet()) {
+            if (config.getConfig(k) != null) {
+                String validBlock = config.getConfig(k).getString("block-type");
+                validGrassBlocks.add(BlockTypeId.fromString(validBlock));
+
+                blockConfig.put(BlockTypeId.fromString(validBlock),
+                        new BlockConfig(
+                                config.getConfig(k).getInt("min-height"),
+                                config.getConfig(k).getInt("max-height")
+                        )
+                );
+            }
         }
 
         for (Map.Entry<String, ConfigValue> e : grow.entrySet()) {
@@ -219,6 +231,11 @@ public class GrassActor extends KonstructsActor {
             for (int i = process_num_blocks; i > 0; i--) {
                 int pos = (int) (Math.random() * dirtBlocksToGrow.size());
                 QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
+
+                BlockConfig bc = blockConfig.get(block.getType());
+                if (block.getPosition().getY() > bc.getMax()) continue;
+                if (block.getPosition().getY() < bc.getMin()) continue;
+
                 blocks.put(block.getPosition(), block.getType());
 
                 for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
