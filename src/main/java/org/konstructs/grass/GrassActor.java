@@ -226,13 +226,7 @@ public class GrassActor extends KonstructsActor {
         }
 
         replaceBlocks(blockFilter, blocks);
-
-        // Schedule another ProcessDirtBlock in 0.5s - queue size seconds (min 1ms delay)
-        int next_tick = Math.max(1, (int)(500000 / simulation_speed) - dirtBlocksToGrow.size() * 1000);
-
-        getContext().system().scheduler().scheduleOnce(
-                Duration.create(next_tick, TimeUnit.MICROSECONDS),
-                getSelf(), new ProcessDirtBlock(), getContext().system().dispatcher(), null);
+        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
     }
 
     /**
