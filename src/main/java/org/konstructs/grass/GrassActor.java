@@ -6,6 +6,7 @@ import com.typesafe.config.ConfigValue;
 import konstructs.api.*;
 import konstructs.api.messages.BlockUpdateEvent;
 import konstructs.api.messages.BoxQueryResult;
+import konstructs.api.messages.GlobalConfig;
 import konstructs.plugin.Config;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
@@ -82,6 +83,14 @@ public class GrassActor extends KonstructsActor {
         }
 
         super.onReceive(message); // Handle konstructs messages
+    }
+
+    /**
+     * Set tick speed
+     */
+    @Override
+    public void onGlobalConfig(GlobalConfig config) {
+        simulation_speed = config.getSimulationSpeed();
     }
 
     /**
