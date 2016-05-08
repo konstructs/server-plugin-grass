@@ -64,8 +64,7 @@ public class GrassActor extends KonstructsActor {
 
                 blockConfig.put(BlockTypeId.fromString(validBlock),
                         new BlockConfig(
-                                config.getConfig(k).getInt("min-height"),
-                                config.getConfig(k).getInt("max-height")
+                                config.getConfig(k).getInt("prefer-height")
                         )
                 );
             }
@@ -197,7 +196,7 @@ public class GrassActor extends KonstructsActor {
 
                         if (Math.random() < this.change_rate) {
                             // Get a new random grass block
-                            blockIdToGrow = getRandomBlockTypeId();
+                            blockIdToGrow = getRandomBlockTypeId(start);
                         }
 
                         dirtBlocksToGrow.add(new QueuedGrassBlock(
@@ -213,9 +212,28 @@ public class GrassActor extends KonstructsActor {
 
     }
 
-    private BlockTypeId getRandomBlockTypeId() {
-        int pos = (int) (Math.random() * validGrassBlocks.size());
-        return validGrassBlocks.get(pos);
+    private BlockTypeId getRandomBlockTypeId(Position p) {
+
+        // Calc total weight relative to our height
+        int total_weight = 0;
+        for(Map.Entry<BlockTypeId, BlockConfig> m : blockConfig.entrySet()) {
+            total_weight += m.getValue().weightTo(p);
+        }
+
+        // Select a random position in the range
+        int rval = (int)(Math.random() * total_weight);
+
+        // Find the block
+        BlockTypeId found = validGrassBlocks.get(0); // base value
+        int min_weight = 1000;
+        for(Map.Entry<BlockTypeId, BlockConfig> m : blockConfig.entrySet()) {
+            if (m.getValue().weightTo(p) < min_weight) { // we found a better match
+                min_weight = m.getValue().weightTo(p);
+                found = m.getKey();
+            }
+        }
+
+        return found;
     }
 
     /**
@@ -231,10 +249,6 @@ public class GrassActor extends KonstructsActor {
             for (int i = process_num_blocks; i > 0; i--) {
                 int pos = (int) (Math.random() * dirtBlocksToGrow.size());
                 QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
-
-                BlockConfig bc = blockConfig.get(block.getType());
-                if (block.getPosition().getY() > bc.getMax()) continue;
-                if (block.getPosition().getY() < bc.getMin()) continue;
 
                 blocks.put(block.getPosition(), block.getType());
 
