@@ -255,8 +255,11 @@ public class GrassActor extends KonstructsActor {
 
                 // Get and place blocks under the new block
                 BlockConfig bc = blockConfig.get(block.getType());
-                for (int t = 1; t < 7; t++) {
-                    blocks.put(block.getPosition().subtractY(t), bc.getBlockUnder());
+                BlockTypeId blockUnder = bc.getBlockUnder();
+                if(!growsOn.contains(blockUnder)) {
+                    for (int t = 1; t < 7; t++) {
+                        blocks.put(block.getPosition().subtractY(t), blockUnder);
+                    }
                 }
 
                 for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
