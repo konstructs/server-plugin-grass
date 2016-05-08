@@ -65,7 +65,8 @@ public class GrassActor extends KonstructsActor {
                 blockConfig.put(BlockTypeId.fromString(validBlock),
                         new BlockConfig(
                                 config.getConfig(k).getInt("prefer-height"),
-                                (float)config.getConfig(k).getDouble("transition-sharpness") / 100.0f
+                                (float)config.getConfig(k).getDouble("transition-sharpness") / 100.0f,
+                                BlockTypeId.fromString(config.getConfig(k).getString("block-type-under"))
                         )
                 );
             }
@@ -249,7 +250,14 @@ public class GrassActor extends KonstructsActor {
                 int pos = (int) (Math.random() * dirtBlocksToGrow.size());
                 QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
 
+                // Put the new block
                 blocks.put(block.getPosition(), block.getType());
+
+                // Get and place blocks under the new block
+                BlockConfig bc = blockConfig.get(block.getType());
+                for (int t = 1; t < 7; t++) {
+                    blocks.put(block.getPosition().subtractY(t), bc.getBlockUnder());
+                }
 
                 for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
                     QueuedGrassBlock qblock = it.next();
