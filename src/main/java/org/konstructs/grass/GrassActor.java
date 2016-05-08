@@ -64,7 +64,8 @@ public class GrassActor extends KonstructsActor {
 
                 blockConfig.put(BlockTypeId.fromString(validBlock),
                         new BlockConfig(
-                                config.getConfig(k).getInt("prefer-height")
+                                config.getConfig(k).getInt("prefer-height"),
+                                (float)config.getConfig(k).getDouble("transition-sharpness") / 100.0f
                         )
                 );
             }
@@ -196,7 +197,7 @@ public class GrassActor extends KonstructsActor {
 
                         if (Math.random() < this.change_rate) {
                             // Get a new random grass block
-                            blockIdToGrow = getRandomBlockTypeId(start);
+                            blockIdToGrow = getRandomBlockTypeId(start, blockIdToGrow);
                         }
 
                         dirtBlocksToGrow.add(new QueuedGrassBlock(
@@ -212,24 +213,22 @@ public class GrassActor extends KonstructsActor {
 
     }
 
-    private BlockTypeId getRandomBlockTypeId(Position p) {
+    private BlockTypeId getRandomBlockTypeId(Position p, BlockTypeId found) {
 
-        // Calc total weight relative to our height
-        int total_weight = 0;
+        // Calc total range
+        float total_weight = 0.0f;
         for(Map.Entry<BlockTypeId, BlockConfig> m : blockConfig.entrySet()) {
-            total_weight += m.getValue().weightTo(p);
+            total_weight += m.getValue().inverseDistanceTo(p);
         }
 
         // Select a random position in the range
-        int rval = (int)(Math.random() * total_weight);
+        float rval = (float)Math.random() * total_weight;
 
-        // Find the block
-        BlockTypeId found = validGrassBlocks.get(0); // base value
-        int min_weight = 1000;
+        float offc = 0.0f;
         for(Map.Entry<BlockTypeId, BlockConfig> m : blockConfig.entrySet()) {
-            if (m.getValue().weightTo(p) < min_weight) { // we found a better match
-                min_weight = m.getValue().weightTo(p);
-                found = m.getKey();
+            offc += m.getValue().inverseDistanceTo(p);
+            if (rval < offc) {
+                return m.getKey();
             }
         }
 

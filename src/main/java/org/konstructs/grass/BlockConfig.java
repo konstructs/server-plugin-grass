@@ -5,17 +5,20 @@ import konstructs.api.Position;
 public class BlockConfig {
 
     private int prefer_height;
+    private float fuzzy;
 
-    public BlockConfig(int prefer_height) {
+    public BlockConfig(int prefer_height, float fuzzy) {
         this.prefer_height = prefer_height;
+        this.fuzzy = fuzzy;
     }
 
     public int getPreferHeight() {
         return prefer_height;
     }
 
-    public int weightTo(Position pos) {
-        return Math.max(getPreferHeight(), pos.getY()) -
-                Math.min(getPreferHeight(), pos.getY());
+    public float inverseDistanceTo(Position pos) {
+        float dist = 1.0f / ((float)Math.abs(getPreferHeight() - pos.getY()));
+        return dist > fuzzy ? dist : 0;
     }
+
 }
