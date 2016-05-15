@@ -25,7 +25,7 @@ public class GrassActor extends KonstructsActor {
     private ArrayList<BlockTypeId> validGrassBlocks;
     private ArrayList<BlockTypeId> growsOn;
     private ArrayList<BlockTypeId> growsUnder;
-    private float change_rate;
+    private int change_rate;
     private float default_tick_speed;
     private HashMap<BlockTypeId, BlockConfig> blockConfig;
 
@@ -54,7 +54,7 @@ public class GrassActor extends KonstructsActor {
 
         simulation_speed = 1;
 
-        this.change_rate = ((float)change_rate) / 10000;
+        this.change_rate = change_rate;
         this.default_tick_speed = default_tick_speed;
 
         for (String k : config.root().keySet()) {
@@ -66,7 +66,8 @@ public class GrassActor extends KonstructsActor {
                         new BlockConfig(
                                 config.getConfig(k).getInt("prefer-height"),
                                 (float)config.getConfig(k).getDouble("transition-sharpness") / 100.0f,
-                                BlockTypeId.fromString(config.getConfig(k).getString("block-type-under"))
+                                BlockTypeId.fromString(config.getConfig(k).getString("block-type-under")),
+                                config.getConfig(k).getInt("distance-multiplier")
                         )
                 );
             }
@@ -149,7 +150,7 @@ public class GrassActor extends KonstructsActor {
 
         Position start = result.getBox().getFrom();
         BlockTypeId blockIdToGrow = result.getLocal(new Position(1, 1, 1)); // Get center block
-
+        BlockConfig blockConfigToGrow = blockConfig.get(blockIdToGrow);
         int[] checkPos = {
                 0, 1, // N corner
                 1, 2, // E corner
@@ -195,8 +196,8 @@ public class GrassActor extends KonstructsActor {
                 // Found dirt, add to list and stop search
                 if (growsOn.contains(typeId)) {
                     if (h < 3) { // Never allow the 1st layer, we requested it to check for vacuum
-
-                        if (Math.random() < this.change_rate) {
+                        float local_change_rate = (float)(change_rate + blockConfigToGrow.distanceTo(start) * 10) / 10000.0f;
+                        if (Math.random() < local_change_rate) {
                             // Get a new random grass block
                             blockIdToGrow = getRandomBlockTypeId(start, blockIdToGrow);
                         }
