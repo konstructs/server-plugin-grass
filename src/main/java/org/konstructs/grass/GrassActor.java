@@ -10,13 +10,11 @@ import konstructs.api.messages.GlobalConfig;
 import konstructs.plugin.Config;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
-import scala.concurrent.duration.Duration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 public class GrassActor extends KonstructsActor {
 
@@ -27,6 +25,9 @@ public class GrassActor extends KonstructsActor {
     private ArrayList<BlockTypeId> validGrassBlocks;
     private ArrayList<BlockTypeId> growsOn;
     private ArrayList<BlockTypeId> growsUnder;
+    private int change_rate;
+    private float default_tick_speed;
+    private HashMap<BlockTypeId, BlockConfig> blockConfig;
 
     private BlockFilter blockFilter;
 
@@ -40,18 +41,36 @@ public class GrassActor extends KonstructsActor {
     public GrassActor(ActorRef universe,
                       com.typesafe.config.Config config,
                       com.typesafe.config.Config grow,
-                      com.typesafe.config.Config under) {
+                      com.typesafe.config.Config under,
+                      int change_rate,
+                      int default_tick_speed) {
         super(universe);
 
         dirtBlocksToGrow = new ArrayList<>();
         validGrassBlocks = new ArrayList<>();
         growsOn = new ArrayList<>();
         growsUnder = new ArrayList<>();
+        blockConfig = new HashMap<>();
 
         simulation_speed = 1;
 
-        for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
-            validGrassBlocks.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
+        this.change_rate = change_rate;
+        this.default_tick_speed = default_tick_speed;
+
+        for (String k : config.root().keySet()) {
+            if (config.getConfig(k) != null) {
+                String validBlock = config.getConfig(k).getString("block-type");
+                validGrassBlocks.add(BlockTypeId.fromString(validBlock));
+
+                blockConfig.put(BlockTypeId.fromString(validBlock),
+                        new BlockConfig(
+                                config.getConfig(k).getInt("prefer-height"),
+                                (float)config.getConfig(k).getDouble("transition-sharpness") / 100.0f,
+                                BlockTypeId.fromString(config.getConfig(k).getString("block-type-under")),
+                                config.getConfig(k).getInt("distance-multiplier")
+                        )
+                );
+            }
         }
 
         for (Map.Entry<String, ConfigValue> e : grow.entrySet()) {
@@ -69,7 +88,8 @@ public class GrassActor extends KonstructsActor {
         }
 
         // Schedule a ProcessDirtBlock in 2 seconds
-        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
+        scheduleSelfOnce(new ProcessDirtBlock(),
+                (int)(this.default_tick_speed / simulation_speed));
     }
 
     /**
@@ -130,7 +150,7 @@ public class GrassActor extends KonstructsActor {
 
         Position start = result.getBox().getFrom();
         BlockTypeId blockIdToGrow = result.getLocal(new Position(1, 1, 1)); // Get center block
-
+        BlockConfig blockConfigToGrow = blockConfig.get(blockIdToGrow);
         int[] checkPos = {
                 0, 1, // N corner
                 1, 2, // E corner
@@ -176,10 +196,10 @@ public class GrassActor extends KonstructsActor {
                 // Found dirt, add to list and stop search
                 if (growsOn.contains(typeId)) {
                     if (h < 3) { // Never allow the 1st layer, we requested it to check for vacuum
-
-                        if (Math.random() < 0.005) {
+                        float local_change_rate = (float)(change_rate + blockConfigToGrow.distanceTo(start) * 10) / 10000.0f;
+                        if (Math.random() < local_change_rate) {
                             // Get a new random grass block
-                            blockIdToGrow = getRandomBlockTypeId();
+                            blockIdToGrow = getRandomBlockTypeId(start, blockIdToGrow);
                         }
 
                         dirtBlocksToGrow.add(new QueuedGrassBlock(
@@ -195,9 +215,26 @@ public class GrassActor extends KonstructsActor {
 
     }
 
-    private BlockTypeId getRandomBlockTypeId() {
-        int pos = (int) (Math.random() * validGrassBlocks.size());
-        return validGrassBlocks.get(pos);
+    private BlockTypeId getRandomBlockTypeId(Position p, BlockTypeId found) {
+
+        // Calc total range
+        float total_weight = 0.0f;
+        for(Map.Entry<BlockTypeId, BlockConfig> m : blockConfig.entrySet()) {
+            total_weight += m.getValue().inverseDistanceTo(p);
+        }
+
+        // Select a random position in the range
+        float rval = (float)Math.random() * total_weight;
+
+        float offc = 0.0f;
+        for(Map.Entry<BlockTypeId, BlockConfig> m : blockConfig.entrySet()) {
+            offc += m.getValue().inverseDistanceTo(p);
+            if (rval < offc) {
+                return m.getKey();
+            }
+        }
+
+        return found;
     }
 
     /**
@@ -213,7 +250,18 @@ public class GrassActor extends KonstructsActor {
             for (int i = process_num_blocks; i > 0; i--) {
                 int pos = (int) (Math.random() * dirtBlocksToGrow.size());
                 QueuedGrassBlock block = dirtBlocksToGrow.get(pos);
+
+                // Put the new block
                 blocks.put(block.getPosition(), block.getType());
+
+                // Get and place blocks under the new block
+                BlockConfig bc = blockConfig.get(block.getType());
+                BlockTypeId blockUnder = bc.getBlockUnder();
+                if(!growsOn.contains(blockUnder)) {
+                    for (int t = 1; t < 7; t++) {
+                        blocks.put(block.getPosition().subtractY(t), blockUnder);
+                    }
+                }
 
                 for (Iterator<QueuedGrassBlock> it = dirtBlocksToGrow.iterator(); it.hasNext(); ) {
                     QueuedGrassBlock qblock = it.next();
@@ -226,7 +274,8 @@ public class GrassActor extends KonstructsActor {
         }
 
         replaceBlocks(blockFilter, blocks);
-        scheduleSelfOnce(new ProcessDirtBlock(), (int)(2000 / simulation_speed));
+        scheduleSelfOnce(new ProcessDirtBlock(),
+                (int)(this.default_tick_speed / simulation_speed));
     }
 
     /**
@@ -242,9 +291,12 @@ public class GrassActor extends KonstructsActor {
                               ActorRef universe,
                               @Config(key = "types") com.typesafe.config.Config types,
                               @Config(key = "grows-on") com.typesafe.config.Config grow,
-                              @Config(key = "grows-under") com.typesafe.config.Config under){
+                              @Config(key = "grows-under") com.typesafe.config.Config under,
+                              @Config(key = "change-rate") int change_rate,
+                              @Config(key = "default-tick-speed") int default_tick_speed){
 
         Class currentClass = new Object() { }.getClass().getEnclosingClass();
-        return Props.create(currentClass, universe, types, grow, under);
+        return Props.create(currentClass, universe, types, grow, under, change_rate,
+                            default_tick_speed);
     }
 }
