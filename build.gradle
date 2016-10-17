@@ -7,6 +7,10 @@ repositories {
     }
 }
 
+compileJava {
+    sourceCompatibility = 1.7
+}
+
 dependencies {
     compile group: 'org.konstructs', name: 'konstructs-server-api', version: '0.1.6'
 }
