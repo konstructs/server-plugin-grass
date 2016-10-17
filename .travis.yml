@@ -1,0 +1,17 @@
+---
+
+language: java
+jdk:
+  - oraclejdk8
+  - oraclejdk7
+  - openjdk7
+
+deploy:
+  provider: releases
+  api_key:
+    secure: U9GPCTs3AyxHDHN4QoZXhZVrIi0fjPz03igHUrXz0uPJLPtQEjWtvnGUoXzzKV/RsX+8b36syuPRhjSggU0t0JM7fSXE8kpQcLM7FlW/TLWnkRmWoRhYYcPxeXM3SjWNF8inl9wCJ7O395mcoYUIaHLTpwfEv5GeiTe2No0a4uj3I8w6OfcdeiqOrhMR/9sJQYSAJtLFjES/LXWIPqCAzHq2o5sQv3ML0KogO/Jw+cnDICEOTYSVgQPcRF47Di3K33puYelxzzrZDO49oCiRGlXgGqXs6arZO/CebApyFVcb6KZjSXeNmCdPJeMZZF6tHmD/KIGsZFHOOwvrFYVkHhIly1Sgxgusfx9eecX4Zq/guUsAU9lvRRnKl5M28pv92aF8VXfGKqG3duTKgWo4wC9BKv1fXVDQjx5zL6E03WrM+uDInxYD51cf69Gwdr9z3OuaEilUp6qbHo/YdYiCdw8p9VyB0dnZjxFHfHjBcaEUsAscsrYhVjhDMcdjy09l49BAxDbqPbKQj5uNqN20yjQ8e6fo77YBfC2ZxaoPd9V83ggRGSvRUKPqMJEhxKUCLC7gmjR07C/ZnzjDk0dUqkOsEeTwj9wajtf38ihx62cLCBaCof9In2Orh00wLfssWQ479ytPDiT0RCAkIqe6j4LDr6OTp4mI0HRcB0RUuMI=
+  file: build/libs/server-plugin-grass.jar
+  on:
+    repo: konstructs/server-plugin-grass
+    tags: true
+    java: openjdk7

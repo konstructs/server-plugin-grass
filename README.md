@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/konstructs/server-plugin-grass.svg?branch=master)](https://travis-ci.org/konstructs/server-plugin-grass)
+
 # server-plugin-grass
 
 This plugin manages grass on a server, basically it grows grass by replacing dirt blocks with grass blocks.
