@@ -14,4 +14,4 @@ deploy:
   on:
     repo: konstructs/server-plugin-grass
     tags: true
-    java: openjdk7
+    jdk: openjdk7
