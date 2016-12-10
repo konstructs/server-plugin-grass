@@ -7,6 +7,7 @@ import konstructs.api.*;
 import konstructs.api.messages.BlockUpdateEvent;
 import konstructs.api.messages.BoxQueryResult;
 import konstructs.api.messages.GlobalConfig;
+import konstructs.api.messages.GetBlockFactory;
 import konstructs.plugin.Config;
 import konstructs.plugin.KonstructsActor;
 import konstructs.plugin.PluginConstructor;
@@ -24,11 +25,10 @@ public class GrassActor extends KonstructsActor {
     private ArrayList<QueuedGrassBlock> dirtBlocksToGrow;
     private ArrayList<BlockTypeId> validGrassBlocks;
     private ArrayList<BlockTypeId> growsOn;
-    private ArrayList<BlockTypeId> growsUnder;
     private int change_rate;
     private float default_tick_speed;
     private HashMap<BlockTypeId, BlockConfig> blockConfig;
-
+    private BlockFactory factory = null;
     private BlockFilter blockFilter;
 
     private float simulation_speed;
@@ -41,15 +41,14 @@ public class GrassActor extends KonstructsActor {
     public GrassActor(ActorRef universe,
                       com.typesafe.config.Config config,
                       com.typesafe.config.Config grow,
-                      com.typesafe.config.Config under,
                       int change_rate,
                       int default_tick_speed) {
         super(universe);
+        universe.tell(GetBlockFactory.MESSAGE, getSelf());
 
         dirtBlocksToGrow = new ArrayList<>();
         validGrassBlocks = new ArrayList<>();
         growsOn = new ArrayList<>();
-        growsUnder = new ArrayList<>();
         blockConfig = new HashMap<>();
 
         simulation_speed = 1;
@@ -77,10 +76,6 @@ public class GrassActor extends KonstructsActor {
             growsOn.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
         }
 
-        for (Map.Entry<String, ConfigValue> e : under.entrySet()) {
-            growsUnder.add(BlockTypeId.fromString((String)e.getValue().unwrapped()));
-        }
-
         // Create a block filter used in growDirtBlock(..)
         blockFilter = BlockFilterFactory.NOTHING;
         for (BlockTypeId bt : growsOn) {
@@ -103,9 +98,11 @@ public class GrassActor extends KonstructsActor {
         if (message instanceof ProcessDirtBlock) {
             processDirtBlock();
             return;
+        } else if(message instanceof BlockFactory) {
+            factory = (BlockFactory)message;
+        } else {
+            super.onReceive(message); // Handle konstructs messages
         }
-
-        super.onReceive(message); // Handle konstructs messages
     }
 
     /**
@@ -190,8 +187,8 @@ public class GrassActor extends KonstructsActor {
 
                 BlockTypeId typeId = result.getLocal(new Position(x, h, y));
 
-                // Found vacuum, continue
-                if (growsUnder.contains(typeId)) continue;
+                // Found transparent, skip and anything below is ok
+                if (factory.getBlockType(typeId).isTransparent()) continue;
 
                 // Found dirt, add to list and stop search
                 if (growsOn.contains(typeId)) {
@@ -291,12 +288,11 @@ public class GrassActor extends KonstructsActor {
                               ActorRef universe,
                               @Config(key = "types") com.typesafe.config.Config types,
                               @Config(key = "grows-on") com.typesafe.config.Config grow,
-                              @Config(key = "grows-under") com.typesafe.config.Config under,
                               @Config(key = "change-rate") int change_rate,
                               @Config(key = "default-tick-speed") int default_tick_speed){
 
         Class currentClass = new Object() { }.getClass().getEnclosingClass();
-        return Props.create(currentClass, universe, types, grow, under, change_rate,
+        return Props.create(currentClass, universe, types, grow, change_rate,
                             default_tick_speed);
     }
 }
