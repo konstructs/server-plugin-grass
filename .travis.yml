@@ -3,8 +3,6 @@
 language: java
 jdk:
   - oraclejdk8
-  - oraclejdk7
-  - openjdk7
 
 deploy:
   provider: releases
@@ -14,4 +12,4 @@ deploy:
   on:
     repo: konstructs/server-plugin-grass
     tags: true
-    jdk: openjdk7
+    jdk: oraclejdk8
